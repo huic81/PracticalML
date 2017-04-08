@@ -1,0 +1,160 @@
+---
+title: "Practical Machine Learning Course Project - Prediction Exercise Manner"
+author: "Hwee See"
+date: "April 8, 2017"
+output: html_document
+keep_md: yes
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r setworkingdir, echo=FALSE}
+setwd("~/Git/PracticalML/PracticalML")
+```  
+
+# Executive Summary
+This report aim to predict the manner in which people did the Unilateral Dumbbell Biceps Curl exercise. The dataset used in this report - the Weight Lifting Exercises Dataset comprises of data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants who were asked to perform barbell lifts in 5 different ways (Classe), which are exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). Only Class A corresponds to correct performance. This report will describe how the model was built, cross validation performed, and the expected out of sample error. The prediction model will then used to predict 20 different test cases.  
+
+#Data Processing  
+## Package Loading and Data Loading  
+```{r load_prerequisites, echo=TRUE, results='hide'}
+#This report use following libraries: 
+library(caret); 
+library(rattle); 
+library(rpart); 
+library(rpart.plot)
+library(randomForest); 
+```  
+The training and test data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.  
+```{r load_data, cache=TRUE}
+# import the data from the URLs
+trainurl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testurl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+if(!file.exists("./data")) {dir.create("./data")}
+desttrainfilepath <- "./data/pml-training.csv"
+desttestfilepath <- "./data/pml-testing.csv"
+if(!file.exists(desttrainfilepath)) {download.file(trainurl,destfile = desttrainfilepath)}
+if(!file.exists(desttestfilepath)) {download.file(testurl,destfile = desttestfilepath)}
+trainingsource <- read.csv(desttrainfilepath)
+testingsource  <- read.csv(desttestfilepath)
+```  
+## Data Exploration  
+```{r explore_data_pre, results='hide'}
+str(trainingsource) #hide result
+```  
+```{r explore_data, results='hide'}
+summary(trainingsource) #hide result
+```  
+The training data set consists of 19622 observations of 160 variables.  
+Records with no records comes in in three forms: "NA","#DIV/0!","".  
+And there are also variables with less than 90% of records with value.  
+
+##Data Cleaning  
+Reload data with standardized na string, then remove all variables that contain > 90% missing values and the preceeding 7 variables that contains the exercise participants ID, name and non-sensor related information.  
+```{r clean_data}
+#reload records with standardized na string for no value
+trainingsource <- read.csv(desttrainfilepath, na.strings = c("NA","#DIV/0!",""))
+testingsource  <- read.csv(desttestfilepath, na.strings = c("NA","#DIV/0!",""))
+# remove variables that are mostly NA
+manyNA    <- sapply(trainingsource, function(x) mean(is.na(x))) > 0.90
+trainset <- trainingsource[, manyNA==FALSE]
+testset  <- testingsource[, manyNA==FALSE]
+# remove participants information & non-sensor related variables
+trainset <- trainset[, -(1:7)]
+testset  <- testset[, -(1:7)]
+```  
+```{r clean_data_hide}
+str(trainset)
+```  
+Resulting training set is 19622 observations with 53 variables.  
+
+## Data Spliting  
+Next, the training set will be split into training set (70%) and testing set (30%).  
+```{r split_data, results='hide'}
+set.seed(12345) 
+inTrain <- createDataPartition(trainset$classe, p = 0.7, list = FALSE)
+modeltrain <- trainset[inTrain, ]
+modeltest <- trainset[-inTrain, ]
+```  
+
+# Build the Prediction Model  
+Three algorithm will be applied to model the prediction using the train set. Prediction will be testify using the test set. And the methods with the highest accuracy will be choosen.  
+
+## 1. Random forest (rf)  
+```{r random_forest_model}
+modelRF <- randomForest(classe ~ ., data=modeltrain)
+modelRF
+```  
+```{r random_forest_prediction}
+predictRF <- predict(modelRF, newdata=modeltest)
+confmatRF <- confusionMatrix(predictRF, modeltest$classe)
+confmatRF
+```
+The model accuracy is `r confmatRF$overall['Accuracy']`.  
+```{r random_forest_visualization}
+# plot confusion matrix
+plot(confmatRF$table, col = confmatRF$byClass, main = paste("Random Forest Accuracy = ", round(confmatRF$overall['Accuracy'], 4)))
+```  
+
+## 2. Decision trees (rpart)  
+```{r decision_tree_model}
+modelDT <- rpart(classe ~ ., data=modeltrain, method="class")
+fancyRpartPlot(modelDT)
+```  
+```{r decision_tree_prediction}
+predictDT <- predict(modelDT, modeltest, type = "class")
+confmatDT <- confusionMatrix(predictDT, modeltest$classe)
+confmatDT
+```  
+The model accuracy is `r confmatDT$overall['Accuracy']`.  
+```{r decision_tree_visualization}
+# plot confusion matrix
+plot(confmatDT$table, col = confmatDT$byClass, main = paste("Decision Tree Accuracy = ", round(confmatDT$overall['Accuracy'], 4)))
+```  
+
+## 3. Generalized Boosted Model (gbm)  
+```{r GBM_model}
+controlGBM <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+modelGBM  <- train(classe ~ ., data=modeltrain, method = "gbm", trControl = controlGBM, verbose = FALSE)
+modelGBM$finalModel
+```  
+```{r GBM_prediction}
+predictGBM <- predict(modelGBM, newdata=modeltest)
+confmatGBM <- confusionMatrix(predictGBM, modeltest$classe)
+confmatGBM
+```  
+The model accuracy is `r confmatGBM$overall['Accuracy']`.  
+```{r GBM_visualization}
+# plot confusion matrix
+plot(confmatGBM$table, col = confmatGBM$byClass, main = paste("Generalized Boosted Model Accuracy = ", round(confmatGBM$overall['Accuracy'], 4)))
+```  
+
+# Conclusion  
+The accuracy and it's expected out-of-sample error of the three models are:  
+
+No | Model | Accuracy | Expected out-of-sample Error 
+---|-------|----------|------------------------------ 
+1. | Random forest (rf) | `r confmatRF$overall['Accuracy']*100` | `r (1 -  confmatRF$overall['Accuracy'])*100`  
+2. | Decision trees (rpart) | `r confmatDT$overall['Accuracy']*100` | `r (1 -  confmatDT$overall['Accuracy'])*100`  
+3. | Generalized Boosted Model (gbm) | `r confmatGBM$overall['Accuracy']*100` | `r (1 -  confmatGBM$overall['Accuracy'])*100`  
+
+# Predicting Test Cases  
+The Random Forest model will be choosed to predict the given 20 testing set.
+```{r predict_test}
+predicttestset <- predict(modelRF, newdata=testset, type = "class")
+predicttestset
+```  
+
+# Submission File Generation
+```{r assignment_submission}
+pml_write_files = function(x){
+  n = length(x)
+  path <- "./answers"
+  if(!file.exists("./answers")) {dir.create("./answers")}
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=file.path(path, filename),quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+pml_write_files(predicttestset)
+```  
