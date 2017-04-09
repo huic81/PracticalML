@@ -4,10 +4,11 @@ author: "Hwee See"
 date: "April 8, 2017"
 output: html_document
 keep_md: yes
----
+---  
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-```
+```  
 ```{r setworkingdir, echo=FALSE}
 setwd("~/Git/PracticalML/PracticalML")
 ```  
@@ -134,12 +135,12 @@ The accuracy and it's expected out-of-sample error of the three models are:
 
 No | Model | Accuracy | Expected out-of-sample Error 
 ---|-------|----------|------------------------------ 
-1. | Random forest (rf) | `r confmatRF$overall['Accuracy']*100` | `r (1 -  confmatRF$overall['Accuracy'])*100`  
+1. | Random forest (rf) | `r confmatRF$overall['Accuracy']*100` | `r (1 -  confmatRF$overall['Accuracy'])*100` 
 2. | Decision trees (rpart) | `r confmatDT$overall['Accuracy']*100` | `r (1 -  confmatDT$overall['Accuracy'])*100`  
-3. | Generalized Boosted Model (gbm) | `r confmatGBM$overall['Accuracy']*100` | `r (1 -  confmatGBM$overall['Accuracy'])*100`  
+3. | Generalized Boosted Model (gbm) | `r confmatGBM$overall['Accuracy']*100` | `r (1 -  confmatGBM$overall['Accuracy'])*100` 
 
 # Predicting Test Cases  
-The Random Forest model will be choosed to predict the given 20 testing set.
+The Random Forest model with the highest accuracy (99%) will be choosed to predict the given 20 testing set.
 ```{r predict_test}
 predicttestset <- predict(modelRF, newdata=testset, type = "class")
 predicttestset
